@@ -1,9 +1,9 @@
 """Sensor platform for Kidde Homesafe integration."""
 
 from __future__ import annotations
-import logging
+
 import datetime
-import typing
+import logging
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -116,9 +116,72 @@ _SENSOR_DESCRIPTIONS = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
     ),
+    SensorEntityDescription(
+        key="alarm_interval",
+        icon="mdi:alarm-check",
+        name="Alarm Interval",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="alarm_reset_time",
+        icon="mdi:alarm-snooze",
+        name="Alarm Reset Time",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="battery_level",
+        icon="mdi:battery-high",
+        name="Battery Level",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    SensorEntityDescription(
+        key="battery_voltage",
+        icon="mdi:battery",
+        name="Battery Voltage",
+        native_unit_of_measurement=UnitOfElectricPotential.VOLT,
+        suggested_display_precision=2,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        device_class=SensorDeviceClass.VOLTAGE,
+    ),
+    SensorEntityDescription(
+        key="checkin_interval",
+        icon="mdi:clock-check",
+        name="Checkin Interval",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+    ),
+    SensorEntityDescription(
+        key="hold_alarm_time",
+        icon="mdi:alarm-plus",
+        name="Alarm Hold Time",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="rapid_temperature_variation_status",
+        icon="mdi:swap-vertical-variant",
+        name="Temperature Variation Status",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="temperature_variation_value",
+        icon="mdi:swap-vertical-variant",
+        name="Temperature Variation",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    SensorEntityDescription(
+        key="temperature",
+        name="Temperature",
+        icon="mdi:home-thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
+    ),
 )
 
-_MEASUREMENTSENSOR_DESCRIPTIONS = (
+_SENSOR_MEASUREMENT_DESCRIPTIONS = (
     SensorEntityDescription(
         key="iaq_temperature",
         name="Indoor Temperature",
@@ -158,29 +221,42 @@ _MEASUREMENTSENSOR_DESCRIPTIONS = (
 )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_devices: AddEntitiesCallback) -> None:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: ConfigEntry, async_add_devices: AddEntitiesCallback
+) -> None:
     """Set up the sensor platform."""
     coordinator: KiddeCoordinator = hass.data[DOMAIN][entry.entry_id]
-    sensors = []
-    for device_id in coordinator.data.devices:
+    sensors: list[SensorEntity] = []
+
+    for device_id, device_data in coordinator.data.devices.items():
+        logger.debug(
+            "Checking model: [%s]",
+            coordinator.data.devices[device_id].get(KEY_MODEL, "Unknown"),
+        )
+
         for entity_description in _TIMESTAMP_DESCRIPTIONS:
-            sensors.append(
-                KiddeSensorTimestampEntity(coordinator, device_id, entity_description)
-            )
-        for entity_description in _SENSOR_DESCRIPTIONS:
-            sensors.append(
-                KiddeSensorEntity(coordinator, device_id, entity_description)
-            )
-        if "temperature" in coordinator.data.devices[device_id].get(
-            "capabilities"
-        ) and coordinator.data.devices[device_id].get("iaq"):
-            # The unit also has an Indoor Air Quality Monitor
-            for measuremententity_description in _MEASUREMENTSENSOR_DESCRIPTIONS:
+            if entity_description.key in device_data:
                 sensors.append(
-                    KiddeSensorMeasurementEntity(
-                        coordinator, device_id, measuremententity_description
+                    KiddeSensorTimestampEntity(
+                        coordinator, device_id, entity_description
                     )
                 )
+
+        for entity_description in _SENSOR_DESCRIPTIONS:
+            if entity_description.key in device_data:
+                sensors.append(
+                    KiddeSensorEntity(coordinator, device_id, entity_description)
+                )
+
+        for entity_description in _SENSOR_MEASUREMENT_DESCRIPTIONS:
+            if entity_description.key in device_data:
+                sensors.append(
+                    KiddeSensorMeasurementEntity(
+                        coordinator, device_id, entity_description
+                    )
+                )
+
+    # NOTE: It is possible that sensors is an empty list. Is that OK?
 
     async_add_devices(sensors)
 
@@ -250,7 +326,7 @@ class KiddeSensorMeasurementEntity(KiddeEntity, SensorEntity):
 
     @property
     def state_class(self) -> str:
-        """Return the state class of sensor"""
+        """Return the state class of sensor."""
         return SensorStateClass.MEASUREMENT
 
     @property
