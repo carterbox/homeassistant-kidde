@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity import EntityDescription
+from homeassistant.helpers.entity import DeviceInfo, EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from kidde_homesafe import KiddeCommand
 
-from .const import DOMAIN
-from .const import MANUFACTURER
+from .const import DOMAIN, MANUFACTURER
 from .coordinator import KiddeCoordinator
 
 # Constants for dictionary keys
@@ -54,13 +52,17 @@ class KiddeEntity(CoordinatorEntity[KiddeCoordinator]):
         model_string = ""
         match model_type:
             case "wifiiaqdetector":
-                model_string = f"WiFi IAQ Detector ({model_type})"
+                model_string = f"Smoke Detector with IAQ ({model_type})"
             case "waterleakdetector":
                 model_string = f"Water Leak + Freeze Detector ({model_type})"
+            case "wifidetector":
+                model_string = f"Smoke Detector ({model_type})"
+            case "cowifidetector":
+                model_string = f"Carbon Monoxide Detector ({model_type})"
             case _:
                 model_string = f"{model_type}"
                 if logger.isEnabledFor(logging.DEBUG):
-                    logger.WARNING(
+                    logger.warning(
                         "Unverified Kidde Device Model: [%s] ... Please send Kidde device data to maintainers.",
                         model_type,
                     )
